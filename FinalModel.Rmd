@@ -1,0 +1,97 @@
+---
+title: "assignment8"
+output: html_document
+---
+
+```{r,message=F}
+require(caret)
+require(dplyr)
+require(DMwR2)
+require(rpart)
+require(randomForest)
+require(C50)
+require(ROCR)
+require(randomForest)
+```
+
+
+#Load the data
+```{r}
+training<-read.csv("training.csv",stringsAsFactors = T)
+testing<-read.csv("testing.csv",stringsAsFactors = T)
+
+```
+
+#Preprocess
+##Dealing with Missing values and blank 
+```{r}
+##For training data
+training$classe<-factor(training$classe)
+f<-function(x){sum(is.na(x)|x=="")}
+NAs<-apply(training,2,f)
+NABlank<-as.data.frame(NAs)
+colNAblank<-which(NABlank$NAs==14261)
+data<-training[,-colNAblank]
+cleandata<-centralImputation(data)
+##For testing data
+NAs2<-apply(testing,2,f)
+NABlank2<-as.data.frame(NAs)
+colNAblank2<-which(NABlank$NAs==14261)
+data2<-testing[,-colNAblank2]
+testData<-centralImputation(data2)
+
+```
+
+
+##Exclude informational variables
+```{r}
+candidate<-grepl("belt|[^(fore)]arm|dumbbell|forearm",names(cleandata))
+##The resulte indicates that Column 1-7 are information variables and are excluded,
+##Column 37  is a factor with more than 52 levels which indicattes it is a informational variable too.
+modeldata<-cleandata[,-c(1:7)]
+modeldata<-modeldata[,-37]
+
+testData<-testData[,-c(1:7)]
+testData<-testData[,-37]
+
+```
+
+
+##Drop levels of the independent variable
+```{r, message = F}
+modeldata<-modeldata%>%
+  filter(classe %in% c("A","B","C","D"))
+modeldata$classe<-droplevels(modeldata$classe)
+```
+
+
+##Splitting the training data
+```{r}
+x<-createDataPartition(modeldata$classe,p=0.6,list=F)
+trainData<-modeldata[x,]
+validateData<-modeldata[-x,]
+```
+
+
+#Building the model with Random Forest
+```{r}
+fit_RF<-randomForest(classe~.,data=trainData)
+
+```
+
+
+#Making predictions on the validating data
+```{r}
+p_RF<-predict(fit_RF,validateData,type="response")
+```
+
+#Model Evaluation
+```{r}
+confusionMatrix(p_RF, validateData$classe)
+```
+`
+#Making Prediction on the test data
+```{r}
+p_test<-predict(fit_RF,testData)
+```
+
